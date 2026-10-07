@@ -1,15 +1,27 @@
 import json
+import subprocess
+import sys
 from django.contrib import messages
 from django.shortcuts import render, redirect
 from .models import Prediction
-from .ml import DATA_DIR, MODEL_DIR, artifacts_ready, load_dataset, predict_url, train_all
+from .ml import DATA_DIR, MODEL_DIR, STATUS_FILE, artifacts_ready, load_dataset, predict_url
 
 def home(request):
     metrics = {}
     path = MODEL_DIR / "metrics.json"
     if path.exists():
         metrics = json.loads(path.read_text())
-    return render(request, "home.html", {"metrics": metrics, "ready": artifacts_ready()})
+    status = {}
+    if STATUS_FILE.exists():
+        try:
+            status = json.loads(STATUS_FILE.read_text())
+        except json.JSONDecodeError:
+            status = {"status": "unknown", "message": "Training status unavailable."}
+    return render(request, "home.html", {
+        "metrics": metrics,
+        "ready": artifacts_ready(),
+        "training": status,
+    })
 
 def upload_dataset(request):
     if request.method != "POST":
@@ -40,12 +52,34 @@ def train_models_view(request):
     if not dataset.exists():
         messages.error(request, "Upload malicious_phish.csv first.")
         return redirect("home")
+    status = {}
+    if STATUS_FILE.exists():
+        try:
+            status = json.loads(STATUS_FILE.read_text())
+        except json.JSONDecodeError:
+            pass
+    if status.get("status") in {"starting", "running"}:
+        messages.info(request, "Training is already running.")
+        return redirect("home")
     try:
         epochs = max(1, min(int(request.POST.get("epochs", "5")), 30))
-        train_all(dataset, epochs=epochs)
-        messages.success(request, "Bi-LSTM, Bi-GRU and hybrid models trained successfully.")
-    except Exception as exc:
-        messages.error(request, f"Training failed: {exc}")
+    except ValueError:
+        epochs = 5
+    STATUS_FILE.write_text(json.dumps({
+        "status": "starting",
+        "message": "Training job is starting in the background...",
+        "epoch": 0,
+        "total_epochs": epochs,
+    }, indent=2))
+    log = (MODEL_DIR / "training.log").open("a", buffering=1)
+    process = subprocess.Popen(
+        [sys.executable, "manage.py", "train_models", "--dataset", str(dataset), "--epochs", str(epochs)],
+        stdout=log,
+        stderr=log,
+        start_new_session=True,
+        close_fds=True,
+    )
+    messages.success(request, f"Training started in background. Job ID: {process.pid}.")
     return redirect("home")
 
 def predict_view(request):

@@ -1,0 +1,14 @@
+.git
+.github
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+db.sqlite3
+model/*.keras
+model/*.pkl
+model/*.json
+data/malicious_phish.csv
+staticfiles
+media

@@ -62,43 +62,57 @@ def build_model(kind, vocab_size, num_classes):
     )
     return model
 
+STATUS_FILE = MODEL_DIR / "training_status.json"
+
+def write_training_status(status, message="", **extra):
+    STATUS_FILE.write_text(json.dumps({"status": status, "message": message, **extra}, indent=2))
+
 def train_all(dataset_path, epochs=5, test_size=0.34):
-    df = load_dataset(dataset_path)
-    x_train, x_test, y_train, y_test = train_test_split(
-        df["url"].values,
-        df["type"].values,
-        test_size=test_size,
-        random_state=42,
-        stratify=df["type"].values,
-    )
-    tokenizer = Tokenizer(num_words=VOCAB_LIMIT, char_level=True, oov_token="[OOV]")
-    tokenizer.fit_on_texts(x_train)
-    X_train = pad_sequences(tokenizer.texts_to_sequences(x_train), maxlen=MAX_LEN, padding="post", truncating="post")
-    X_test = pad_sequences(tokenizer.texts_to_sequences(x_test), maxlen=MAX_LEN, padding="post", truncating="post")
-    le = LabelEncoder()
-    le.fit(df["type"])
-    ytr = le.transform(y_train)
-    yte = le.transform(y_test)
-    joblib.dump(tokenizer, MODEL_DIR / "tokenizer.pkl")
-    joblib.dump(le, MODEL_DIR / "label_encoder.pkl")
-    results = {}
-    for kind in ("bilstm", "bigru", "hybrid"):
-        model = build_model(kind, min(VOCAB_LIMIT, len(tokenizer.word_index) + 1), len(le.classes_))
-        callbacks = [tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=2, restore_best_weights=True)]
-        model.fit(X_train, ytr, validation_split=0.1, epochs=epochs, batch_size=128, callbacks=callbacks, verbose=2)
-        model.save(MODEL_DIR / f"{kind}.keras")
-        probs = model.predict(X_test, batch_size=512, verbose=0)
-        preds = np.argmax(probs, axis=1)
-        p, r, f, _ = precision_recall_fscore_support(yte, preds, average="weighted", zero_division=0)
-        results[kind] = {
-            "accuracy": float(accuracy_score(yte, preds)),
-            "precision": float(p),
-            "recall": float(r),
-            "f1": float(f),
-            "confusion_matrix": confusion_matrix(yte, preds).tolist(),
-        }
-    (MODEL_DIR / "metrics.json").write_text(json.dumps(results, indent=2))
-    return results
+    write_training_status("running", "Loading and preparing the dataset...", epoch=0, total_epochs=epochs)
+    try:
+        df = load_dataset(dataset_path)
+        x_train, x_test, y_train, y_test = train_test_split(
+            df["url"].values,
+            df["type"].values,
+            test_size=test_size,
+            random_state=42,
+            stratify=df["type"].values,
+        )
+        write_training_status("running", f"Preparing {len(x_train):,} training URLs and {len(x_test):,} test URLs...", epoch=0, total_epochs=epochs)
+        tokenizer = Tokenizer(num_words=VOCAB_LIMIT, char_level=True, oov_token="[OOV]")
+        tokenizer.fit_on_texts(x_train)
+        X_train = pad_sequences(tokenizer.texts_to_sequences(x_train), maxlen=MAX_LEN, padding="post", truncating="post")
+        X_test = pad_sequences(tokenizer.texts_to_sequences(x_test), maxlen=MAX_LEN, padding="post", truncating="post")
+        le = LabelEncoder()
+        le.fit(df["type"])
+        ytr = le.transform(y_train)
+        yte = le.transform(y_test)
+        joblib.dump(tokenizer, MODEL_DIR / "tokenizer.pkl")
+        joblib.dump(le, MODEL_DIR / "label_encoder.pkl")
+        results = {}
+        for kind in ("bilstm", "bigru", "hybrid"):
+            write_training_status("running", f"Training {kind.upper()} model...", model=kind, epoch=0, total_epochs=epochs)
+            model = build_model(kind, min(VOCAB_LIMIT, len(tokenizer.word_index) + 1), len(le.classes_))
+            callbacks = [tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=2, restore_best_weights=True)]
+            model.fit(X_train, ytr, validation_split=0.1, epochs=epochs, batch_size=128, callbacks=callbacks, verbose=2)
+            model.save(MODEL_DIR / f"{kind}.keras")
+            write_training_status("running", f"Evaluating {kind.upper()} model...", model=kind, epoch=epochs, total_epochs=epochs)
+            probs = model.predict(X_test, batch_size=512, verbose=0)
+            preds = np.argmax(probs, axis=1)
+            p, r, f, _ = precision_recall_fscore_support(yte, preds, average="weighted", zero_division=0)
+            results[kind] = {
+                "accuracy": float(accuracy_score(yte, preds)),
+                "precision": float(p),
+                "recall": float(r),
+                "f1": float(f),
+                "confusion_matrix": confusion_matrix(yte, preds).tolist(),
+            }
+        (MODEL_DIR / "metrics.json").write_text(json.dumps(results, indent=2))
+        write_training_status("completed", "All models trained successfully.", epoch=epochs, total_epochs=epochs)
+        return results
+    except Exception as exc:
+        write_training_status("failed", str(exc))
+        raise
 
 def artifacts_ready():
     return all((MODEL_DIR / f).exists() for f in ["tokenizer.pkl", "label_encoder.pkl", "hybrid.keras"])

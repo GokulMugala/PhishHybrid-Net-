@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>URL Prediction</h1>
+<div class="card">
+<form method="post">
+{% csrf_token %}
+<input name="url" value="{{ url|default:'' }}" placeholder="https://example.com/login" required>
+<button>Analyze</button>
+</form>
+</div>
+{% if error %}<div class="card"><strong>Error:</strong> {{ error }}</div>{% endif %}
+{% if label %}
+<div class="card">
+<h2>Result</h2>
+<p>URL: <code>{{ url }}</code></p>
+<p>Class: <strong>{{ label }}</strong></p>
+<p>Confidence: <strong>{{ confidence }}</strong></p>
+</div>
+{% endif %}
+{% endblock %}

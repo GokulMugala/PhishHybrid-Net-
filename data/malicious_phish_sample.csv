@@ -1,0 +1,13 @@
+url,type
+https://www.google.com,benign
+https://www.wikipedia.org/wiki/Computer,benign
+https://github.com/login,benign
+http://example.com/index.html,benign
+http://secure-login-paypal.example.com/login,phishing
+http://paypal.verify-account.example.com/update,phishing
+http://192.168.1.50/login.php,phishing
+http://bank-account-confirm.example.net/verify,phishing
+http://example.com/<script>alert(1)</script>,defacement
+http://example.org/admin/upload-shell.php,defacement
+http://bad.example.com/malware.exe,malware
+http://download.example.net/trojan/setup.exe,malware

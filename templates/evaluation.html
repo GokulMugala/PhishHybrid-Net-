@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Evaluation</h1>
+{% if metrics %}
+<table><tr><th>Model</th><th>Accuracy</th><th>Precision</th><th>Recall</th><th>F1</th></tr>
+{% for name,m in metrics.items %}
+<tr><td>{{ name }}</td><td>{{ m.accuracy|floatformat:4 }}</td><td>{{ m.precision|floatformat:4 }}</td><td>{{ m.recall|floatformat:4 }}</td><td>{{ m.f1|floatformat:4 }}</td></tr>
+{% endfor %}</table>
+{% else %}<p>Train the models first.</p>{% endif %}
+{% endblock %}

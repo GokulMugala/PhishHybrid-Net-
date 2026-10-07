@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phishing Detection</title>
+<style>
+body{font-family:Arial,sans-serif;background:#f5f7fb;margin:0;color:#172033}
+nav{background:#111827;padding:16px 7%;display:flex;gap:22px}
+nav a{color:white;text-decoration:none;font-weight:600}
+main{max-width:1050px;margin:35px auto;padding:0 20px}
+.card{background:white;border-radius:14px;padding:24px;margin:18px 0;box-shadow:0 5px 22px #00000012}
+button{background:#2563eb;color:white;border:0;border-radius:8px;padding:11px 18px;cursor:pointer}
+input{padding:11px;border:1px solid #ccd3df;border-radius:8px;width:min(100%,650px)}
+table{width:100%;border-collapse:collapse}th,td{padding:12px;border-bottom:1px solid #e5e7eb;text-align:left}
+.msg{padding:12px;border-radius:8px;background:#eef4ff;margin:10px 0}
+.badge{display:inline-block;padding:8px 12px;border-radius:999px;background:#eef2ff}
+</style>
+</head>
+<body>
+<nav><a href="/">Home</a><a href="/predict/">Predict</a><a href="/evaluation/">Evaluation</a></nav>
+<main>
+{% for message in messages %}<div class="msg">{{ message }}</div>{% endfor %}
+{% block content %}{% endblock %}
+</main>
+</body>
+</html>
